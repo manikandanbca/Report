@@ -1,4 +1,3 @@
-# Report
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -63,7 +62,7 @@ public class XmlDiff
     {
         if (element1 == null && element2 == null)
         {
-            return; // Both elements are null, no difference.
+            return;
         }
 
         if (element1 == null || element2 == null)
@@ -83,7 +82,13 @@ public class XmlDiff
             differences.Add($"Value mismatch at {path}/{element1.Name}: '{element1.Value}' vs '{element2.Value}'");
         }
 
-        // Compare attributes
+        CompareAttributes(element1, element2, path, differences);
+
+        CompareChildren(element1, element2, path, differences);
+    }
+
+    private static void CompareAttributes(XElement element1, XElement element2, string path, List<string> differences)
+    {
         var attributes1 = element1.Attributes().ToDictionary(a => a.Name.ToString(), a => a.Value);
         var attributes2 = element2.Attributes().ToDictionary(a => a.Name.ToString(), a => a.Value);
 
@@ -99,15 +104,17 @@ public class XmlDiff
             }
         }
 
-        foreach(var attr2 in attributes2)
+        foreach (var attr2 in attributes2)
         {
-            if(!attributes1.ContainsKey(attr2.Key))
+            if (!attributes1.ContainsKey(attr2.Key))
             {
                 differences.Add($"Attribute '{attr2.Key}' missing in file 1 at {path}/{element2.Name}");
             }
         }
+    }
 
-        // Compare child elements recursively
+    private static void CompareChildren(XElement element1, XElement element2, string path, List<string> differences)
+    {
         var children1 = element1.Elements().ToList();
         var children2 = element2.Elements().ToList();
 
