@@ -1,40 +1,23 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Xml.Linq;
 
-public class XmlDiff
+public class XmlComparer
 {
     public static void Main(string[] args)
     {
-        if (args.Length != 2)
-        {
-            Console.WriteLine("Usage: XmlDiff <file1.xml> <file2.xml>");
-            return;
-        }
-
-        string file1 = args[0];
-        string file2 = args[1];
-
-        if (!File.Exists(file1) || !File.Exists(file2))
-        {
-            Console.WriteLine("One or both files do not exist.");
-            return;
-        }
+        string file1Path = "file1.xml"; // Replace with your file paths
+        string file2Path = "file2.xml";
 
         try
         {
-            XDocument doc1 = XDocument.Load(file1);
-            XDocument doc2 = XDocument.Load(file2);
+            XDocument doc1 = XDocument.Load(file1Path);
+            XDocument doc2 = XDocument.Load(file2Path);
 
-            List<string> differences = FindDifferences(doc1, doc2);
+            List<string> differences = CompareXml(doc1.Root, doc2.Root);
 
-            if (differences.Count == 0)
-            {
-                Console.WriteLine("No differences found.");
-            }
-            else
+            if (differences.Any())
             {
                 Console.WriteLine("Differences found:");
                 foreach (string diff in differences)
@@ -42,90 +25,71 @@ public class XmlDiff
                     Console.WriteLine(diff);
                 }
             }
+            else
+            {
+                Console.WriteLine("No differences found.");
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error: {ex.Message}");
+            Console.WriteLine("Error: " + ex.Message);
         }
     }
 
-    public static List<string> FindDifferences(XDocument doc1, XDocument doc2)
+
+    public static List<string> CompareXml(XElement element1, XElement element2)
     {
         List<string> differences = new List<string>();
 
-        CompareElements(doc1.Root, doc2.Root, "", differences);
-
-        return differences;
-    }
-
-    private static void CompareElements(XElement element1, XElement element2, string path, List<string> differences)
-    {
-        if (element1 == null && element2 == null)
-        {
-            return;
-        }
-
-        if (element1 == null || element2 == null)
-        {
-            differences.Add($"Element mismatch at {path}: {(element1 == null ? "Missing in file 1" : "Missing in file 2")}");
-            return;
-        }
-
         if (element1.Name != element2.Name)
         {
-            differences.Add($"Element name mismatch at {path}: {element1.Name} vs {element2.Name}");
-            return;
+            differences.Add($"Element name mismatch: {element1.Name} vs {element2.Name}");
+            return differences; // If names differ, no need to compare children
         }
 
-        if (element1.Value != element2.Value)
+        // Compare attributes (ignoring order)
+        var attributes1 = element1.Attributes().OrderBy(a => a.Name.LocalName).ToList();
+        var attributes2 = element2.Attributes().OrderBy(a => a.Name.LocalName).ToList();
+
+        if (attributes1.Count != attributes2.Count)
         {
-            differences.Add($"Value mismatch at {path}/{element1.Name}: '{element1.Value}' vs '{element2.Value}'");
+            differences.Add($"Attribute count mismatch in element {element1.Name}");
         }
-
-        CompareAttributes(element1, element2, path, differences);
-
-        CompareChildren(element1, element2, path, differences);
-    }
-
-    private static void CompareAttributes(XElement element1, XElement element2, string path, List<string> differences)
-    {
-        var attributes1 = element1.Attributes().ToDictionary(a => a.Name.ToString(), a => a.Value);
-        var attributes2 = element2.Attributes().ToDictionary(a => a.Name.ToString(), a => a.Value);
-
-        foreach (var attr1 in attributes1)
+        else
         {
-            if (!attributes2.ContainsKey(attr1.Key))
+            for (int i = 0; i < attributes1.Count; i++)
             {
-                differences.Add($"Attribute '{attr1.Key}' missing in file 2 at {path}/{element1.Name}");
-            }
-            else if (attributes2[attr1.Key] != attr1.Value)
-            {
-                differences.Add($"Attribute value mismatch at {path}/{element1.Name}['{attr1.Key}']: '{attr1.Value}' vs '{attributes2[attr1.Key]}'");
+                if (attributes1[i].Name != attributes2[i].Name || attributes1[i].Value != attributes2[i].Value)
+                {
+                    differences.Add($"Attribute mismatch in element {element1.Name}: {attributes1[i].Name} = {attributes1[i].Value} vs {attributes2[i].Name} = {attributes2[i].Value}");
+                }
             }
         }
 
-        foreach (var attr2 in attributes2)
+
+
+        // Compare child elements (ignoring order)
+        var children1 = element1.Elements().OrderBy(e => e.Name.LocalName).ToList(); // Order matters for counting
+        var children2 = element2.Elements().OrderBy(e => e.Name.LocalName).ToList();
+
+        if (children1.Count != children2.Count)
         {
-            if (!attributes1.ContainsKey(attr2.Key))
+            differences.Add($"Child element count mismatch in element {element1.Name}");
+        }
+        else
+        {
+            for (int i = 0; i < children1.Count; i++)
             {
-                differences.Add($"Attribute '{attr2.Key}' missing in file 1 at {path}/{element2.Name}");
+                differences.AddRange(CompareXml(children1[i], children2[i]));
             }
         }
-    }
 
-    private static void CompareChildren(XElement element1, XElement element2, string path, List<string> differences)
-    {
-        var children1 = element1.Elements().ToList();
-        var children2 = element2.Elements().ToList();
-
-        int maxChildren = Math.Max(children1.Count, children2.Count);
-
-        for (int i = 0; i < maxChildren; i++)
+        // Compare values if no children (leaf nodes)
+        if (!children1.Any() && !children2.Any() && element1.Value != element2.Value)
         {
-            XElement child1 = i < children1.Count ? children1[i] : null;
-            XElement child2 = i < children2.Count ? children2[i] : null;
-
-            CompareElements(child1, child2, $"{path}/{element1.Name}", differences);
+            differences.Add($"Value mismatch in element {element1.Name}: {element1.Value} vs {element2.Value}");
         }
+
+        return differences;
     }
 }
