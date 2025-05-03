@@ -1,4 +1,39 @@
-[23/04, 12:20] Sudhir: Optimizing the Dashboard hfas yielded significant operational advantages. The prior limitations of 15-second load times and a 100 concurrent user cap hindered operational agility and scalability. Our investigation revealed that excessive network traffic between the data source and service layer was the primary constraint. By logically consolidating this traffic, we've created a more efficient and scalable operational environment. The 80% reduction in page load time improves daily user workflows, while the ability to now support over 1000 concurrent users provides the operational flexibility needed for growth without incurring immediate infrastructure upgrades. This scalability directly supports the transition of 7 legacy report users, consolidating reporting within a more operationally efficient platform.
-[23/04, 12:20] Sudhir: Improved Productivity: Faster load times mean user can do more in the same amount of time.
- * Scalability as an Operational Advantage: The ability to handle more users without immediate capital expenditure.
- * Decommissioning Legacy Systems (Implied): Moving users
+// Essbase Report Script: Cross Join Columns Example
+// Cross-joining Scenario and Time dimensions
+
+{ } // Report Script Block Start
+
+// --- Page Dimensions (Filters) ---
+<PAGE (Year, Market)
+  "FY2025"     // Example: Filter for Fiscal Year 2025
+  "California" // Example: Filter for California market
+
+// --- Column Dimensions (The Cross Join) ---
+// Specify the dimensions to be cross-joined in the columns
+<COLUMN (Scenario, Time) // Dimension order matters for nesting
+
+  // Members for the first dimension (Scenario) - Outer loop
+  Actual Budget
+
+  // Members for the second dimension (Time) - Inner loop
+  Jan Feb
+
+  // How Essbase processes this:
+  // 1. Takes "Actual" (from Scenario) -> Pairs with "Jan" (from Time) -> Column 1: Actual / Jan
+  // 2. Takes "Actual" (from Scenario) -> Pairs with "Feb" (from Time) -> Column 2: Actual / Feb
+  // 3. Takes "Budget" (from Scenario) -> Pairs with "Jan" (from Time) -> Column 3: Budget / Jan
+  // 4. Takes "Budget" (from Scenario) -> Pairs with "Feb" (from Time) -> Column 4: Budget / Feb
+
+// --- Row Dimensions ---
+<ROW (Measures) // Dimension for the rows
+  Sales
+  COGS
+  "Gross Margin" // Example member name with space
+
+// --- Formatting (Optional) ---
+<DECIMAL 2      // Show 2 decimal places for data
+<WIDTH 14       // Set column width
+<SYM            // Apply width/decimal symmetrically
+<SUPEMPTYROWS   // Suppress rows if all data is #Missing or zero
+
+! // Execute the report generation
